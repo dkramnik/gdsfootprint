@@ -32,7 +32,7 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	print( 'Searching for pads...' )
 	# =================================================================
 
-	pad_matches = search_for_insts_with_trans_by_name( topcell_in, 'curcvpad' )
+	pad_matches = search_for_insts_with_trans_by_name( cell = topcell_in, name_str = search_cell_name, verbose = True )
 	pad_trans_list = [ x[ 1 ] for x in pad_matches ]
 	pad_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for trans in pad_trans_list ]
 
@@ -56,7 +56,7 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	print( 'Found {:d} labels in GDS footprint'.format( len( label_trans_tuple_list ) ) )
 
 	# Check that the number of pads and labels matches
-	assert( len( pad_coord_list ) == len( label_trans_tuple_list ) )
+	assert( len( pad_coord_list ) == len( label_trans_tuple_list ) ), "Number of pads and labels should match."
 
 	# =================================================================
 	print( 'Associating pads with labels and building pad list...' )
@@ -71,7 +71,9 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 		# Iterate through labels and compute the distance to each one,
 		# go through whole list each time so that any labels that could be associated with multiple pads are caught
 		for label_coord in label_coord_list:
-			pad_to_label_dist = np.sqrt( ( pad_coord[ 0 ] - label_coord[ 0 ] )**2 + ( pad_coord[ 1 ] - label_coord[ 1 ] )**2 )
+			pad_to_label_dist = np.sqrt(
+				( pad_coord[ 0 ] - label_coord[ 0 ] )**2 + ( pad_coord[ 1 ] - label_coord[ 1 ] )**2
+			)
 			dist_list.append( pad_to_label_dist )
 
 		# Find the label with minimum distance
@@ -90,7 +92,7 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 		)
 
 	# Check that the label index associations were unique (no single label associated with multiple pads)
-	assert( len( label_index_list ) == len( label_list ) )
+	assert( len( label_index_list ) == len( label_list ) ), "Label to pad association not unique."
 
 	# =================================================================
 	print( 'Done parsing!\n' )
@@ -108,21 +110,23 @@ def generate_footprint_altium_scripts( parsed_gds_in, altium_sym_script_out, alt
 # ================================================================================================
 
 # Utility method for searching for pads in GDS
-def search_for_insts_with_trans_by_name( cell, name_str, trans = pya.Trans.new( 0, 0 ) ):
+def search_for_insts_with_trans_by_name( cell, name_str, trans = pya.Trans.new( 0, 0 ), verbose = False ):
 	inst_list = cell.each_inst( )
 	matches = [ ]
 
 	for inst in inst_list:
 		if inst.is_regular_array( ):
-			#print( 'Scanning array {:d} X {:d} array:'.format( inst.na, inst.nb ), inst.cell.name )
+			if verbose:
+				print( 'Scanning array {:d} X {:d} array:'.format( inst.na, inst.nb ), inst.cell.name )
 			for i in range( inst.na ):
 				for j in range( inst.nb ):				
 					trans_i = pya.Trans( int( i * inst.da.x / inst.cell.layout( ).dbu ), int( i * inst.da.y / inst.cell.layout( ).dbu ) )
 					trans_j = pya.Trans( int( j * inst.db.x / inst.cell.layout( ).dbu ), int( j * inst.db.y / inst.cell.layout( ).dbu ) )
 					array_item_trans = trans * inst.trans * trans_j * trans_i
 					if name_str in inst.cell.name:
-						#print( 'Detected matching inst that is a {:d} X {:d} array:'.format( inst.na, inst.nb ), inst.cell.name )
-						#print( array_item_trans )
+						if verbose:
+							print( 'Detected matching inst that is a {:d} X {:d} array:'.format( inst.na, inst.nb ), inst.cell.name )
+							print( array_item_trans )
 						matches.append( [ inst, array_item_trans ] )
 					else:
 						new_matches = search_for_insts_with_trans_by_name( inst.cell, name_str, array_item_trans )
@@ -150,7 +154,7 @@ def find_text_labels_and_trans( search_layer, cell, trans = pya.Trans.new( 0, 0 
 	# Recursively search through instances (child cells)
 	for inst in cell.each_inst( ):
 		new_matches = find_text_labels_and_trans( search_layer, inst.cell, trans * inst.trans )
-		if len( new_matches ) > 0 :
+		if len( new_matches ) > 0:
 			matches += new_matches
 
 	return matches
