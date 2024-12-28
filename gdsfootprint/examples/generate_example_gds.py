@@ -37,10 +37,11 @@ if __name__ == "__main__":
     label_layer = LAYER.metaltop_label
     outline_layer = LAYER.border
 
-    # Define sizes (not important)
+    # Define pad sizes
     pad_size = 50
     opening_size = 50
 
+    # Define offset from bottom-right corner and array spacings
     os_x = 250
     os_y = 250
     pitch_x = 200
@@ -127,4 +128,4 @@ if __name__ == "__main__":
         layer = outline_layer
     )
 
-    toplevel_assembly.write_gds( 'inputs/test.gds' )
+    toplevel_assembly.write_gds( 'inputs/test_chip.gds' )
