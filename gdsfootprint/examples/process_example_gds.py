@@ -15,8 +15,8 @@ if __name__ == "__main__":
 	gds_file_interposer_pad = os.path.join( dirname_current, "inputs/interposer_pad.gds" )
 
 	gds_file_out = os.path.join( dirname_current, "outputs/test_footprint.gds" )
-	altium_sym_script_out = os.path.join( dirname_current, "outputs/generate_altium_symbol.pas" )
-	altium_fp_script_out = os.path.join( dirname_current, "outputs/generate_altium_footprint.pas" )
+	altium_symbol_script_out = os.path.join( dirname_current, "outputs/generate_altium_symbol.pas" )
+	altium_footprint_script_out = os.path.join( dirname_current, "outputs/generate_altium_footprint.pas" )
 
 	# ================================================================================================
 	# Step 1: Load and parse the chip GDS to find the bump locations and their labels (method #1)
@@ -66,10 +66,9 @@ if __name__ == "__main__":
 
 	fp.generate_footprint_altium_scripts(
 		parsed_gds_in = parsed_gds_by_name,
-		altium_sym_script_out = altium_sym_script_out,
-		altium_fp_script_out = altium_fp_script_out
+		altium_sym_script_out = altium_symbol_script_out,
+		altium_fp_script_out = altium_footprint_script_out
 	)
-	
-	
-	
-	
+
+
+

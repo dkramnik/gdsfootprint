@@ -19,11 +19,11 @@ class Pad:
 
 def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_name = None, search_layer = None ):
 	# =================================================================
-	print( 'Loading input gds file ', self.gds_file_in )
+	print( 'Loading input gds file ', gds_file_in )
 	# =================================================================
 
 	layout_in = pya.Layout( )
-	layout_in.read( self.gds_file_in )
+	layout_in.read( gds_file_in )
 	topcell_in = layout_in.top_cell( )
 
 	print( 'Layout dbu =', layout_in.dbu )
@@ -32,21 +32,23 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	print( 'Searching for pads...' )
 	# =================================================================
 
-	cupillar_matches = search_for_insts_with_trans_by_name( topcell_in, 'curcvpad' )
-	cupillar_trans_list = [ x[ 1 ] for x in cupillar_matches ]
-	cupillar_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for trans in cupillar_trans_list ]
+	pad_matches = search_for_insts_with_trans_by_name( topcell_in, 'curcvpad' )
+	pad_trans_list = [ x[ 1 ] for x in pad_matches ]
+	pad_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for trans in pad_trans_list ]
 
 	# Remove any duplicates (next time check for duplicates in the source GDS within the footprint generation script and prune them there)
-	cupillar_coord_list = set( cupillar_coord_list )
+	pad_coord_list = set( pad_coord_list )
 
-	print( 'Found {:d} curcvpads in GDS footprint'.format( len( cupillar_coord_list ) ) )
+	print( 'Found {:d} pads in GDS footprint'.format( len( pad_coord_list ) ) )
 
 	# =================================================================
 	print( 'Searching for labels...' )
 	# =================================================================
 
 	# Get the layer index that corresponds to the lpp we want to search for in the input layout
-	search_layer = layout_in.find_layer( self.label_layer_info_in )
+	label_layer_info_in = pya.LayerInfo( label_layer_in )
+	search_layer = layout_in.find_layer( label_layer_info_in )
+
 	label_trans_tuple_list = find_text_labels_and_trans( search_layer, topcell_in )
 	label_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for ( label, trans ) in label_trans_tuple_list ]
 	label_list = [ label for ( label, trans ) in label_trans_tuple_list ]
@@ -54,7 +56,7 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	print( 'Found {:d} labels in GDS footprint'.format( len( label_trans_tuple_list ) ) )
 
 	# Check that the number of pads and labels matches
-	assert( len( cupillar_coord_list ) == len( label_trans_tuple_list ) )
+	assert( len( pad_coord_list ) == len( label_trans_tuple_list ) )
 
 	# =================================================================
 	print( 'Associating pads with labels and building pad list...' )
@@ -63,7 +65,7 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	pad_list = [ ]
 	label_index_list = [ ]
 
-	for pad_coord in cupillar_coord_list:
+	for pad_coord in pad_coord_list:
 		dist_list = [ ]
 
 		# Iterate through labels and compute the distance to each one,
