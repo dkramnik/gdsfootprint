@@ -1,7 +1,7 @@
 import gdsfactory as gf
 from gf180.layers import LAYER
 
-@gf.cell 
+@gf.cell
 def c4_bump_octagon( pad_layer, pad_size, opening_layer, opening_size, label_layer, label_str ) -> gf.Component:
     c = gf.Component( )
 
