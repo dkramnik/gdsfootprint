@@ -29,17 +29,17 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	print( 'Layout dbu =', layout_in.dbu )
 
 	# =================================================================
-	print( 'Searching for pads...' )
+	print( 'Searching for IO pads...' )
 	# =================================================================
 
-	pad_matches = search_for_insts_with_trans_by_name( cell = topcell_in, name_str = search_cell_name, verbose = True )
+	pad_matches = find_insts_with_trans_by_name( cell = layout_in.top_cell( ), name_str = search_cell_name, verbose = True )
 	pad_trans_list = [ x[ 1 ] for x in pad_matches ]
 	pad_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for trans in pad_trans_list ]
 
 	# Remove any duplicates (next time check for duplicates in the source GDS within the footprint generation script and prune them there)
 	pad_coord_list = set( pad_coord_list )
 
-	print( 'Found {:d} pads in GDS footprint'.format( len( pad_coord_list ) ) )
+	print( 'Found {:d} IO pads in GDS footprint'.format( len( pad_coord_list ) ) )
 
 	# =================================================================
 	print( 'Searching for labels...' )
@@ -49,9 +49,11 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	label_layer_info_in = pya.LayerInfo( label_layer_in )
 	search_layer = layout_in.find_layer( label_layer_info_in )
 
-	label_trans_tuple_list = find_text_labels_and_trans( search_layer, topcell_in )
+	label_trans_tuple_list = find_text_labels_with_trans( search_layer, layout_in.top_cell( ).flatten( -1, True ) )
 	label_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for ( label, trans ) in label_trans_tuple_list ]
 	label_list = [ label for ( label, trans ) in label_trans_tuple_list ]
+
+	print( label_list )
 
 	print( 'Found {:d} labels in GDS footprint'.format( len( label_trans_tuple_list ) ) )
 
@@ -109,8 +111,8 @@ def generate_footprint_altium_scripts( parsed_gds_in, altium_sym_script_out, alt
 # Utility methods
 # ================================================================================================
 
-# Utility method for searching for pads in GDS
-def search_for_insts_with_trans_by_name( cell, name_str, trans = pya.Trans.new( 0, 0 ), verbose = False ):
+# Utility method for recursively searching for pads in GDS cell
+def find_insts_with_trans_by_name( cell, name_str, trans = pya.Trans.new( 0, 0 ), verbose = False ):
 	inst_list = cell.each_inst( )
 	matches = [ ]
 
@@ -129,21 +131,22 @@ def search_for_insts_with_trans_by_name( cell, name_str, trans = pya.Trans.new( 
 							print( array_item_trans )
 						matches.append( [ inst, array_item_trans ] )
 					else:
-						new_matches = search_for_insts_with_trans_by_name( inst.cell, name_str, array_item_trans )
+						new_matches = find_insts_with_trans_by_name( inst.cell, name_str, array_item_trans )
 						if len( new_matches ) > 0 :
 							matches += new_matches
 		else:
 			if name_str in inst.cell.name:
 				matches.append( [ inst, trans * inst.trans ] )
 			else:
-				new_matches = search_for_insts_with_trans_by_name( inst.cell, name_str, trans * inst.trans )
+				new_matches = find_insts_with_trans_by_name( inst.cell, name_str, trans * inst.trans )
 				if len( new_matches ) > 0 :
 					matches += new_matches
 
 	return matches
 
-# Utility method for searching for labels in GDS
-def find_text_labels_and_trans( search_layer, cell, trans = pya.Trans.new( 0, 0 ) ):
+# Utility method for recursively searching for labels in GDS cell
+def find_text_labels_with_trans( search_layer, cell, trans = pya.Trans.new( 0, 0 ) ):
+	inst_list = cell.each_inst( )
 	matches = [ ]
 
 	# Iterate through all shapes (texts) in the cell
@@ -152,8 +155,8 @@ def find_text_labels_and_trans( search_layer, cell, trans = pya.Trans.new( 0, 0 
 			matches.append( ( shape.text.string, trans * shape.text_trans ) )
 
 	# Recursively search through instances (child cells)
-	for inst in cell.each_inst( ):
-		new_matches = find_text_labels_and_trans( search_layer, inst.cell, trans * inst.trans )
+	for inst in inst_list:
+		new_matches = find_text_labels_with_trans( search_layer, inst.cell, trans * inst.trans )
 		if len( new_matches ) > 0:
 			matches += new_matches
 

@@ -105,7 +105,7 @@ if __name__ == "__main__":
     num_y = 3
     for ind_x in range( num_x ):
         for ind_y in range( num_y ):
-            pad_num = ind_x * num_x + ind_y
+            pad_num = ind_x + ind_y * num_x
             pad_IO =c4_bump_octagon(
                 pad_layer = pad_layer,
                 pad_size = pad_size,
@@ -128,4 +128,11 @@ if __name__ == "__main__":
         layer = outline_layer
     )
 
-    toplevel_assembly.write_gds( 'inputs/test_chip.gds' )
+    gds_path_out = 'inputs/test_chip.gds'
+    toplevel_assembly.write_gds( gds_path_out )
+    print( 'Wrote GDS to:', gds_path_out )
+
+
+
+
+
