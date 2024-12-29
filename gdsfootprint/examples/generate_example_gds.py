@@ -9,12 +9,12 @@ def c4_bump_octagon( pad_layer, pad_width, opening_layer, opening_size, label_la
     # Create top-metal C4 pad
     pad_octagon = c << gf.components.regular_polygon(
         sides = 8,
-        side_length = pad_width / np.sqrt( 4 + 2 * np.sqrt( 2 ) ),
+        side_length = pad_width / ( 1 + np.sqrt( 2 ) ),
         layer = pad_layer
     )
     # Create circular passivation opening over top metal pad
     opening_circle = c << gf.components.circle(
-        radius = opening_size,
+        radius = opening_size / 2,
         angle_resolution = 1,
         layer = opening_layer
     )
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     # Define pad sizes
     pad_width = 100
-    opening_size = 50
+    opening_size = 75
 
     # Define offset from bottom-right corner and array spacings
     os_x = 250

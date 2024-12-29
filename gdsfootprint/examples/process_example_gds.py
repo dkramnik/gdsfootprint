@@ -49,7 +49,7 @@ if __name__ == "__main__":
 		label_layer = label_layer_in,
 		search_by_cell_name = False,
 		search_pad_layer = pad_layer_in,
-		pad_size = 120.71
+		pad_size = 100.0
 	)
 
 	# Double check that the two methods produced identical results
@@ -58,6 +58,7 @@ if __name__ == "__main__":
 		assert( pad1.name == pad2.name ), "Different names: {:s}, {:s}".format( pad1.name, pad2.name )
 		assert( pad1.x_um == pad2.x_um ), "Different xcoords: {:s}, {:s}".format( pad1.x_um, pad2.x_um )
 		assert( pad1.y_um == pad2.y_um ), "Different ycoords: {:s}, {:s}".format( pad1.y_um, pad2.y_um )
+	print( 'Successfully checked that both methods produced the same results.\n' )
 
 	# ================================================================================================
 	# Step 2: Generate a mirrored GDS footprint for a silicon interposer
