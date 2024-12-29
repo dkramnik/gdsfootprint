@@ -51,7 +51,11 @@ if __name__ == "__main__":
 	)
 
 	# Double check that the two methods produced identical results
-	assert( parsed_gds_by_name == parsed_gds_by_layer )
+	assert( len( parsed_gds_by_name ) == len( parsed_gds_by_layer ) )
+	for pad1, pad2 in zip( parsed_gds_by_name, parsed_gds_by_layer ):
+		assert( pad1.name == pad2.name ), "Different names: {:s}, {:s}".format( pad1.name, pad2.name )
+		assert( pad1.x_um == pad2.x_um ), "Different xcoords: {:s}, {:s}".format( pad1.x_um, pad2.x_um )
+		assert( pad1.y_um == pad2.y_um ), "Different ycoords: {:s}, {:s}".format( pad1.y_um, pad2.y_um )
 
 	# ================================================================================================
 	# Step 2: Generate a mirrored GDS footprint for a silicon interposer

@@ -42,7 +42,7 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 		pad_trans_list = [ x[ 1 ] for x in pad_matches ]
 	else:
 		# Get the layer index that corresponds to the lpp we want to search for in the input layout
-		pad_layerinfo = pya.LayerInfo( search_pad_layer )
+		pad_layerinfo = pya.LayerInfo( search_pad_layer[ 0 ], search_pad_layer[ 1 ] )
 		pad_layer_index = layout_in.find_layer( pad_layerinfo )
 
 		print( 'Searching by shapes on layer:', pad_layerinfo, ', index =', pad_layer_index )
@@ -57,7 +57,7 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 	pad_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for trans in pad_trans_list ]
 
 	# Remove any duplicates (next time check for duplicates in the source GDS within the footprint generation script and prune them there)
-	pad_coord_list = set( pad_coord_list )
+	pad_coord_list = sorted( set( pad_coord_list ) )
 
 	print( 'Found {:d} IO pads in GDS footprint'.format( len( pad_coord_list ) ) )
 
@@ -66,7 +66,7 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 	# =================================================================
 
 	# Get the layer index that corresponds to the lpp we want to search for in the input layout
-	label_layerinfo = pya.LayerInfo( label_layer )
+	label_layerinfo = pya.LayerInfo( label_layer[ 0 ], label_layer[ 1 ] )
 	label_layer_index = layout_in.find_layer( label_layerinfo )
 
 	print( 'Searching by text on layer:', label_layerinfo, ', index =', label_layer_index )
