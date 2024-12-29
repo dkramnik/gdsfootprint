@@ -79,6 +79,7 @@ if __name__ == "__main__":
 
 	fp.generate_footprint_altium_scripts(
 		parsed_gds_in = parsed_gds_by_name,
+		part_name = 'test_chip',
 		altium_sym_script_out = altium_symbol_script_out,
 		altium_fp_script_out = altium_footprint_script_out
 	)

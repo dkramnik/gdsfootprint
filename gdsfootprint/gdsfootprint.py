@@ -1,6 +1,7 @@
 # Imports
 from dataclasses import dataclass # https://stackoverflow.com/questions/35988/c-like-structures-in-python
 import numpy as np
+import textwrap
 # KLayout Python API
 import pya
 
@@ -147,7 +148,7 @@ def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_
 	new_cell.copy_tree( pad_cell )
 
 	# =================================================================
-	print( 'Placing pads in output gds file...' )
+	print( 'Placing pads with labels in output gds file...' )
 	# =================================================================
 
 	label_layerinfo = pya.LayerInfo( label_layer_out[ 0 ], label_layer_out[ 1 ] )
@@ -169,7 +170,7 @@ def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_
 	# Create a polygon from the bounding box
 	polygon = pya.Polygon( parsed_gds_in.bbox )
 
-	# Get the layer index for the given layer info
+	# Create a layer index for the given layer info (using layer instead of find_layer)
 	outline_layer_index = layout_out.layer( outline_layer_out[ 0 ], outline_layer_out[ 1 ] )
 
 	# Insert the polygon into the layout at the given layer
@@ -189,7 +190,81 @@ def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_
 
 	return layout_out
 
-def generate_footprint_altium_scripts( parsed_gds_in, altium_sym_script_out, altium_fp_script_out ):
+def generate_footprint_altium_scripts( parsed_gds_in, part_name, altium_sym_script_out, altium_fp_script_out ):
+	# =================================================================
+	print( "Generating footprint script..." )
+	# =================================================================
+
+	f = open( altium_fp_script_out, "w" )
+
+	# Write the beginning of the script
+	f.write( textwrap.dedent( """
+		Var
+		    CurrentLib : IPCB_Library;
+		{..............................................................................}
+
+		{..............................................................................}"""
+		)
+	)
+	f.write( textwrap.dedent( """
+		Procedure CreateALibComponent;
+		Var
+		    NewPCBLibComp : IPCB_LibComponent;
+		    NewPad        : IPCB_Pad;
+		    NewTrack      : IPCB_Track;
+		Begin
+		    If PCBServer = Nil Then Exit;
+		    CurrentLib := PcbServer.GetCurrentPCBLibrary;
+		    If CurrentLib = Nil Then Exit;
+
+
+		    NewPCBLibComp := PCBServer.CreatePCBLibComp;
+		    NewPcbLibComp.Name := '{:s}';
+
+		    CurrentLib.RegisterComponent(NewPCBLibComp);
+
+
+		    PCBServer.PreProcess;
+		""".format( part_name ) )
+	)
+
+	# Add each pad
+	# API reference: https://www.altium.com/documentation/altium-designer/pcb-api-design-objects-interfaces?version=22#IPCB_Pad%20Interface
+	for pad in parsed_gds_in.pad_list:
+		f.write(
+			textwrap.indent(
+				textwrap.dedent( """
+					NewPad := PcbServer.PCBObjectFactory(ePadObject,eNoDimension,eCreate_Default);
+					NewPad.X        := MMsToCoord({:.6f});
+					NewPad.Y        := MMsToCoord({:.6f});
+					NewPad.TopXSize := MMsToCoord({:.6f});
+					NewPad.TopYSize := MMsToCoord({:.6f});
+					NewPad.Layer    := eTopLayer;
+					NewPad.Name     := '{:s}';
+					NewPad.HoleSize := 0.0;
+					NewPCBLibComp.AddPCBObject(NewPad);
+					PCBServer.SendMessageToRobots(NewPCBLibComp.I_ObjectAddress,c_Broadcast,PCBM_BoardRegisteration,NewPad.I_ObjectAddress);\n
+				""".format( 1e-3 * pad.x_um, 1e-3 * pad.y_um, 1e-3 * pad.x_size_um, 1e-3 * pad.y_size_um, pad.name ) ),
+			'    ' )
+		)
+
+	# Write the end of the script
+	f.write( textwrap.dedent( """\n
+			    PCBServer.SendMessageToRobots(CurrentLib.Board.I_ObjectAddress,c_Broadcast,PCBM_BoardRegisteration,NewPCBLibComp.I_ObjectAddress);
+			    PCBServer.PostProcess;
+
+			    CurrentLib.CurrentComponent := NewPcbLibComp;
+			    CurrentLib.Board.ViewManager_FullUpdate;
+			End;
+			{..............................................................................}
+
+			{..............................................................................}
+			End.
+		""" )
+	)
+
+	f.close( )
+
 	return False
 
 # ================================================================================================
