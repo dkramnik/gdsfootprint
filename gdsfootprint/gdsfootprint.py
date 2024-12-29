@@ -7,6 +7,7 @@ import pya
 # Define data class representing a pad (extract from GDS, then send to output writer)
 @dataclass
 class Pad:
+	trans: pya.Trans
 	x_um : float
 	y_um : float
 	x_size_um : float
@@ -88,7 +89,7 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 	pad_list = [ ]
 	label_index_list = [ ]
 
-	for pad_coord in pad_coord_list:
+	for ind, pad_coord in enumerate( pad_coord_list ):
 		dist_list = [ ]
 
 		# Iterate through labels and compute the distance to each one,
@@ -106,6 +107,7 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 		# Add pad entry
 		pad_list.append(
 			Pad(
+				trans = pad_trans_list[ ind ],
 				x_um = pad_coord[ 0 ],
 				y_um = pad_coord[ 1 ],
 				x_size_um = 105,
@@ -123,7 +125,25 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 	return pad_list
 
 def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_out, gds_file_out ):
-	return False
+	# Create a new layout for the interposer
+	layout_out = pya.Layout( )
+	topcell_out = layout_out.create_cell( "footprint_top" )
+
+	# Read in the interposer pad cell
+	layout_pad = pya.Layout( )
+	layout_pad.read( gds_file_interposer_pad )
+	pad_cell = layout_pad.top_cell( )
+	new_cell = layout_out.create_cell( pad_cell.name )
+	new_cell.copy_tree( pad_cell )
+
+	# =================================================================
+	print( 'Placing pads in output gds file...' )
+	# =================================================================
+
+	for pad in parsed_gds_in:
+		topcell_out.insert( pya.CellInstArray( new_cell.cell_index( ), pad.trans ) )	
+
+	return layout_out
 
 def generate_footprint_altium_scripts( parsed_gds_in, altium_sym_script_out, altium_fp_script_out ):
 	return False
