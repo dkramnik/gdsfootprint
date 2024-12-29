@@ -150,8 +150,17 @@ def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_
 	print( 'Placing pads in output gds file...' )
 	# =================================================================
 
+	label_layerinfo = pya.LayerInfo( label_layer_out[ 0 ], label_layer_out[ 1 ] )
+	label_layer_index = layout_out.layer( label_layerinfo )
+
 	for pad in parsed_gds_in.pad_list:
 		topcell_out.insert( pya.CellInstArray( new_cell.cell_index( ), pad.trans ) )
+
+		# Insert text object with label into the output layout at the given layer, align to center
+		text = pya.Text( pad.name, pad.trans )
+		text.valign = pya.VAlign.VAlignCenter		
+		text.halign = pya.HAlign.HAlignCenter
+		topcell_out.shapes( label_layer_index ).insert( text )
 
 	# =================================================================
 	print( 'Drawing chip outline on footprint using bounding box of input gds...' )
