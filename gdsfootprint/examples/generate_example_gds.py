@@ -28,14 +28,27 @@ def c4_bump_octagon( pad_layer, pad_size, opening_layer, opening_size, label_lay
     return c
 
 if __name__ == "__main__":
+    # ================================================================================================
     # Generate a GDS file with an array of pads and labels, mimicking the top-level of some flip-chip SoC
+    # ================================================================================================
 
+    # ================================================================================================
     # Pull the needed layers from the PDK
     # Reference this file: https://github.com/gdsfactory/gf180/blob/main/gf180/layers.py
+    # ================================================================================================
+    
     pad_layer = LAYER.metaltop
     opening_layer = LAYER.pad # Bad name in PDK layer setup: this is a passivation opening, not a pad
     label_layer = LAYER.metaltop_label
     outline_layer = LAYER.border
+
+    print( "Top metal layer is:", pad_layer )
+    print( "Passivation opening layer is:", opening_layer )
+    print( "Label layer is:", label_layer )
+
+    # ================================================================================================
+    # Define other parameters
+    # ================================================================================================
 
     # Define pad sizes
     pad_size = 50
@@ -47,14 +60,16 @@ if __name__ == "__main__":
     pitch_x = 200
     pitch_y = 250
 
-    print( "Top metal layer is:", pad_layer )
-    print( "Passivation opening layer is:", opening_layer )
-    print( "Label layer is:", label_layer )
+    # ================================================================================================
+    # Create gdsfactory component to assemble the GDS into
+    # ================================================================================================
 
     pad_assembly = gf.Component( name = "io_pads" )
 
+    # ================================================================================================
     # Make some VDD and VSS pads using arrays
     # It is important to use both arrays and individual instances for this example to make sure that both work
+    # ================================================================================================
 
     pad_VSS =c4_bump_octagon(
         pad_layer = pad_layer,
@@ -77,30 +92,36 @@ if __name__ == "__main__":
     array_VSS = gf.components.array( component = pad_VSS, columns = 3, rows = 2, spacing = ( 2 * pitch_x, pitch_y ) )
     array_VDD = gf.components.array( component = pad_VDD, columns = 3, rows = 2, spacing = ( 2 * pitch_x, pitch_y ) )
 
-    temp = pad_assembly.add_ref( array_VSS )
+    pad_assembly.add_ref( array_VSS )
     temp = pad_assembly.add_ref( array_VDD )
     temp.move( ( pitch_x, pitch_y ) )
 
-    # Create an array with only one element, which consists of other arrays
+    # ================================================================================================
+    # Add an array with only one element, which is a component consisting of other arrays
+    # ================================================================================================
 
-    array_both = gf.Component( name = "mixed_array" )
-    array_both.add_ref( array_VSS )
-    temp = array_both.add_ref( array_VDD )
+    component_both_arrays = gf.Component( name = "component_both_arrays" )
+    component_both_arrays.add_ref( array_VSS )
+    temp = component_both_arrays.add_ref( array_VDD )
     temp.move( ( pitch_x, 0 ) )
 
-    temp = pad_assembly.add_ref( array_both )
+    array_mixed = gf.components.array( component = component_both_arrays, columns = 1, rows = 1, spacing = ( 0, 0 ) )
+    temp = pad_assembly.add_ref( array_mixed )
     temp.move( ( 0, 6 * pitch_y ) )
 
-    array_mixed = gf.components.array( component = array_both, columns = 1, rows = 1, spacing = ( 0, 0 ) )
-    temp = pad_assembly.add_ref( array_VSS )
+    # ================================================================================================
+    # Add some VDD and VSS pads as individual instances
+    # ================================================================================================
 
-    # Make some VDD and VSS pads as individual instances
     temp = pad_assembly.add_ref( pad_VSS )
     temp.move( ( 0, 2 * pitch_y ) )
     temp = pad_assembly.add_ref( pad_VDD )
     temp.move( ( 2 * pitch_x, 2 * pitch_y ) )
 
+    # ================================================================================================
     # Make some other IO pads one by one with unique names
+    # ================================================================================================
+
     num_x = 5
     num_y = 3
     for ind_x in range( num_x ):
@@ -117,7 +138,10 @@ if __name__ == "__main__":
             ref = pad_assembly.add_ref( pad_IO )
             ref.move( ( ( 0.5 + ind_x ) * pitch_x, ( 3 + ind_y ) * pitch_y ) )
 
+    # ================================================================================================
     # Now put pads and chip outline on top-level
+    # ================================================================================================
+
     toplevel_assembly = gf.Component( name = "chip_top" )
 
     pads = toplevel_assembly.add_ref( pad_assembly )
@@ -127,6 +151,10 @@ if __name__ == "__main__":
         size = ( 2 * os_x + 5 * pitch_x, 2 * os_y + 7 * pitch_y ),
         layer = outline_layer
     )
+
+    # ================================================================================================
+    # Write GDS
+    # ================================================================================================
 
     gds_path_out = 'inputs/test_chip.gds'
     toplevel_assembly.write_gds( gds_path_out )
