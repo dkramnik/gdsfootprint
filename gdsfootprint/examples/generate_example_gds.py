@@ -4,7 +4,7 @@ import numpy as np
 
 @gf.cell
 def c4_bump_octagon( pad_layer, pad_width, opening_layer, opening_size, label_layer, label_str ) -> gf.Component:
-    c = gf.Component( )
+    c = gf.Component( name = "c4_bump_octagon")
 
     # Create top-metal C4 pad
     pad_octagon = c << gf.components.regular_polygon(
@@ -28,9 +28,28 @@ def c4_bump_octagon( pad_layer, pad_width, opening_layer, opening_size, label_la
 
     return c
 
+@gf.cell
+def interposer_pad( pad_layer, pad_width, opening_layer, opening_width ) -> gf.Component:
+    c = gf.Component( name = "interposer_pad" )
+
+    # Create top-metal pad
+    pad_rect = c << gf.components.regular_polygon(
+        sides = 4,
+        side_length = pad_width,
+        layer = pad_layer
+    )
+    # Create passivation opening over top metal pad
+    opening_rect = c << gf.components.regular_polygon(
+        sides = 4,
+        side_length = opening_width,
+        layer = opening_layer
+    )
+
+    return c
+
 if __name__ == "__main__":
     # ================================================================================================
-    # Generate a GDS file with an array of pads and labels, mimicking the top-level of some flip-chip SoC
+    # Step 1: Generate a GDS file with an array of pads and labels, mimicking the top-level of some flip-chip SoC
     # ================================================================================================
 
     # ================================================================================================
@@ -62,15 +81,12 @@ if __name__ == "__main__":
     pitch_y = 250
 
     # ================================================================================================
-    # Create gdsfactory component to assemble the GDS into
-    # ================================================================================================
-
-    pad_assembly = gf.Component( name = "io_pads" )
-
-    # ================================================================================================
     # Make some VDD and VSS pads using arrays
     # It is important to use both arrays and individual instances for this example to make sure that both work
     # ================================================================================================
+
+    # Create gdsfactory component to assemble the GDS into
+    pad_assembly = gf.Component( name = "io_pads" )
 
     pad_VSS = c4_bump_octagon(
         pad_layer = pad_layer,
@@ -161,7 +177,19 @@ if __name__ == "__main__":
     toplevel_assembly.write_gds( gds_path_out )
     print( 'Wrote GDS to:', gds_path_out )
 
+    # ================================================================================================
+    # Step 2: Generate a GDS file for the receive pad on the silicon interposer side
+    # ================================================================================================
 
+    # Make a rectangle for this demo so the interposer footprint is more clearly distinguishable from the input GDS
+    interposer_pad = interposer_pad(
+        pad_layer = pad_layer,
+        pad_width = pad_width,
+        opening_layer = opening_layer,
+        opening_width = pad_width - 20
+    )
 
-
+    gds_path_out = 'inputs/interposer_pad.gds'
+    interposer_pad.write_gds( gds_path_out )
+    print( 'Wrote GDS to:', gds_path_out )
 
