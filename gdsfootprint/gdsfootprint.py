@@ -1,6 +1,6 @@
 # Imports
 from dataclasses import dataclass # https://stackoverflow.com/questions/35988/c-like-structures-in-python
-
+import numpy as np
 # KLayout Python API
 import pya
 
