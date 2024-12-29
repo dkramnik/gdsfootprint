@@ -2,6 +2,8 @@
 from dataclasses import dataclass # https://stackoverflow.com/questions/35988/c-like-structures-in-python
 import numpy as np
 import textwrap
+from natsort import natsorted
+import re
 # KLayout Python API
 import pya
 
@@ -183,14 +185,14 @@ def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_
 	layout_out.transform( pya.Trans.M0 )
 	
 	# =================================================================
-	print( 'Writing footprint GDS to', gds_file_out )
+	print( 'Writing footprint GDS to', gds_file_out, '\n' )
 	# =================================================================
 
 	layout_out.write( gds_file_out )
 
 	return layout_out
 
-def generate_footprint_altium_scripts( parsed_gds_in, part_name, altium_sym_script_out, altium_fp_script_out ):
+def generate_footprint_altium_scripts( parsed_gds_in, part_name, pin_name_groups, altium_sym_script_out, altium_fp_script_out ):
 	# =================================================================
 	print( "Generating footprint script..." )
 	# =================================================================
@@ -264,6 +266,181 @@ def generate_footprint_altium_scripts( parsed_gds_in, part_name, altium_sym_scri
 	)
 
 	f.close( )
+
+	# =================================================================
+	print( "Generating schematic symbol script..." )
+	# =================================================================
+
+	f = open( altium_sym_script_out, "w" )
+
+	# Write the beginning of the script
+	f.write( textwrap.dedent( """		
+		Procedure CreateALibComponent;
+		Var
+		    CurrentLib   : ISch_Lib;
+		    SchComponent : ISch_Component;
+		    R            : ISch_Rectangle;
+		    P1           : ISch_Pin;
+		Begin
+		    If SchServer = Nil Then Exit;
+		    CurrentLib := SchServer.GetCurrentSchDocument;
+		    If CurrentLib = Nil Then Exit;
+
+		    // Check if the document is a Schematic Libary document first
+		    If CurrentLib.ObjectID <> eSchLib Then
+		    Begin
+		         ShowError('Please open schematic library.');
+		         Exit;
+		    End;
+
+		    // Create a library component (a page of the library is created).
+		    SchComponent := SchServer.SchObjectFactory(eSchComponent, eCreate_Default);
+		    If SchComponent = Nil Then Exit;
+
+
+		    // Set up parameters for the library component.
+		    SchComponent.CurrentPartID := 1;
+		    SchComponent.DisplayMode   := 0;
+
+		    // Define the LibReference and add the component to the library.
+		    SchComponent.LibReference := '{:s}';
+		""".format( part_name ) )
+	)
+
+	# Create sorted list of labels
+	pin_name_list_unsorted = [ pad.name for pad in parsed_gds_in.pad_list ]
+	pin_name_list = natsorted( pin_name_list_unsorted )
+
+	# Keep track of the vertical displacement index in the symbol for each pin group
+	pin_name_group_inds = [ 0 for x in pin_name_groups ]
+	ungrouped_pin_ind = 0
+
+	# Add each pin
+	for ind_pin, pin_name in enumerate( pin_name_list ):
+
+		# Use different columns for the different pin name groups
+		grouped_pin_flag = False
+		for ind_group, pin_name_group in enumerate( pin_name_groups ):
+			# Search specifically for the group followed by some number of digits
+			if re.search( pin_name_group, pin_name ): #re.search( '^' + pin_name_group + '\d+$', pin_name ):
+				grouped_pin_flag = True
+				loc_x = 3000 * ( ind_group + 1 )
+				loc_y = 100 * ( pin_name_group_inds[ ind_group ] + 1 )
+				pin_name_group_inds[ ind_group ] += 1
+		if not grouped_pin_flag: # pin is not part of a specified name group
+			loc_x = 0
+			loc_y = 100 * ( ungrouped_pin_ind + 1 )
+			ungrouped_pin_ind += 1
+
+		# Use the unsorted pin name list so that pad and pin designator numbers match
+		# and automatic symbol to footprint assignment in Altium works correctly
+		# Edit 12/27/2023: I found that this only appears to work, but then the footprint doesn't instantiate properly in PCB layouts,
+		# instead the "designator" and "name" should both be set to the same value as the pin name and then symbol/fp correspondence works
+		#designator = pin_name_list_unsorted.index( pin_name ) + 1
+
+		f.write(
+			textwrap.indent(
+				textwrap.dedent( """
+					// Create Pin object
+					P1 := SchServer.SchObjectFactory(ePin, eCreate_Default);
+					If P1 = Nil Then Exit;
+
+					// Define the pin parameters.
+					P1.Location             := Point(MilsToCoord({:d}), MilsToCoord({:d}));
+					P1.Color                := $000000;
+					P1.Orientation          := eRotate180;
+					P1.Designator           := '{:s}';
+					P1.Name                 := '{:s}';
+					P1.OwnerPartId          := CurrentLib.CurrentSchComponent.CurrentPartID;
+					P1.OwnerPartDisplayMode := CurrentLib.CurrentSchComponent.DisplayMode;
+
+					SchComponent.AddSchObject(P1);
+				""".format( loc_x, loc_y, pin_name, pin_name ) ),
+			'    ' )
+		)
+
+	# Print the pins counted in each group
+	print( 'Added {:d} ungrouped pins'.format( ungrouped_pin_ind ) )
+	# Add a rectangle for the ungrouped pins
+	# https://www.altium.com/documentation/altium-designer/schematic-api-design-objects-interfaces?version=22#ISch_Rectangle%20Interface
+	loc_x = 0
+	loc_y = 0
+	cor_x = 1500
+	cor_y = 100 * ( ungrouped_pin_ind + 1 )
+	f.write(
+		textwrap.indent(
+			textwrap.dedent( """
+				// Create Rectangle object
+				R := SchServer.SchObjectFactory(eRectangle, eCreate_Default);
+				If R = Nil Then Exit;
+
+				// Define the rectangle parameters.
+				R.LineWidth   := eSmall;
+				R.Transparent := True;
+				R.Location    := Point(MilsToCoord({:d}), MilsToCoord({:d}));
+				R.Corner      := Point(MilsToCoord({:d}), MilsToCoord({:d}));
+				R.OwnerPartId          := CurrentLib.CurrentSchComponent.CurrentPartID;
+				R.OwnerPartDisplayMode := CurrentLib.CurrentSchComponent.DisplayMode;
+
+				SchComponent.AddSchObject(R);
+			""".format( loc_x, loc_y, cor_x, cor_y ) ),
+		'    ' )
+	)
+
+	for ind_group, pin_name_group in enumerate( pin_name_groups ):
+		print( 'Added {:d} pins to group matching pattern: {:s}'.format( pin_name_group_inds[ ind_group ], pin_name_group ) )
+		# Add a rectangle for the group
+		loc_x = 3000 * ( ind_group + 1 )
+		loc_y = 0
+		cor_x = loc_x + 1000
+		cor_y = 100 * ( pin_name_group_inds[ ind_group ] + 1 )
+		f.write(
+			textwrap.indent(
+				textwrap.dedent( """
+					// Create Rectangle object
+					R := SchServer.SchObjectFactory(eRectangle, eCreate_Default);
+					If R = Nil Then Exit;
+
+					// Define the rectangle parameters.
+					R.LineWidth   := eSmall;
+					R.Transparent := True;
+					R.Location    := Point(MilsToCoord({:d}), MilsToCoord({:d}));
+					R.Corner      := Point(MilsToCoord({:d}), MilsToCoord({:d}));
+					R.OwnerPartId          := CurrentLib.CurrentSchComponent.CurrentPartID;
+					R.OwnerPartDisplayMode := CurrentLib.CurrentSchComponent.DisplayMode;
+
+					SchComponent.AddSchObject(R);
+				""".format( loc_x, loc_y, cor_x, cor_y ) ),
+			'    ' )
+		)	
+
+	# Make sure all the counted indices add up to the total number of pads
+	assert( ( ungrouped_pin_ind + sum( pin_name_group_inds ) ) == len( parsed_gds_in.pad_list ) )			
+
+	# Write the end of the script
+	f.write( textwrap.dedent( """\n		
+			    CurrentLib.AddSchComponent(SchComponent);
+
+			    // Send a system notification that a new component has been added to the library.
+			    SchServer.RobotManager.SendMessage(nil, c_BroadCast, SCHM_PrimitiveRegistration, SCHComponent.I_ObjectAddress);
+			    CurrentLib.CurrentSchComponent := SchComponent;
+
+				CurrentLib.CurrentSchComponent.Designator.Text      := 'ASIC?';
+				CurrentLib.CurrentSchComponent.Comment.Text         := 'Custom IC';
+				CurrentLib.CurrentSchComponent.ComponentDescription := 'Custom IC';
+
+			    // Refresh library.
+			    CurrentLib.GraphicallyInvalidate;
+			End;
+			{..............................................................................}
+
+			{..............................................................................}
+		""" )
+	)
+
+	f.close( )
+
+	print( "Done writing {:s} Altium scripts.\n".format( part_name ) )
 
 	return False
 
