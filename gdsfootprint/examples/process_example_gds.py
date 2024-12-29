@@ -11,6 +11,7 @@ if __name__ == "__main__":
 	pad_layer_in = ( 53, 0 )
 
 	label_layer_out = ( 53, 10 )
+	outline_layer_out = ( 63, 0 )
 
 	dirname_current = os.path.dirname(__file__)
 
@@ -53,8 +54,8 @@ if __name__ == "__main__":
 	)
 
 	# Double check that the two methods produced identical results
-	assert( len( parsed_gds_by_name ) == len( parsed_gds_by_layer ) )
-	for pad1, pad2 in zip( parsed_gds_by_name, parsed_gds_by_layer ):
+	assert( len( parsed_gds_by_name.pad_list ) == len( parsed_gds_by_layer.pad_list ) )
+	for pad1, pad2 in zip( parsed_gds_by_name.pad_list, parsed_gds_by_layer.pad_list ):
 		assert( pad1.name == pad2.name ), "Different names: {:s}, {:s}".format( pad1.name, pad2.name )
 		assert( pad1.x_um == pad2.x_um ), "Different xcoords: {:s}, {:s}".format( pad1.x_um, pad2.x_um )
 		assert( pad1.y_um == pad2.y_um ), "Different ycoords: {:s}, {:s}".format( pad1.y_um, pad2.y_um )
@@ -68,6 +69,7 @@ if __name__ == "__main__":
 		parsed_gds_in = parsed_gds_by_name,
 		gds_file_interposer_pad = gds_file_interposer_pad,
 		label_layer_out = label_layer_out,
+		outline_layer_out = outline_layer_out,
 		gds_file_out = gds_file_out
 	)
 

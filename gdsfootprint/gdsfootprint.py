@@ -14,6 +14,11 @@ class Pad:
 	y_size_um : float
 	name : str
 
+@dataclass
+class ParsedGDS:
+	pad_list: list[ Pad ]
+	bbox: pya.Box
+
 # ================================================================================================
 # Main methods
 # ================================================================================================
@@ -110,8 +115,8 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 				trans = pad_trans_list[ ind ],
 				x_um = pad_coord[ 0 ],
 				y_um = pad_coord[ 1 ],
-				x_size_um = 105,
-				y_size_um = 105,
+				x_size_um = 100,
+				y_size_um = 100,
 				name = label_list[ label_index ].translate( { ord( '<' ) : '_', ord( '>' ) : None } ) # Replace Pin<X> with Pin_X
 			)
 		)
@@ -119,12 +124,17 @@ def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name =
 	# Check that the label index associations were unique (no single label associated with multiple pads)
 	assert( len( label_index_list ) == len( label_list ) ), "Label to pad association not unique."
 
+	parsed_gds = ParsedGDS(
+		pad_list = pad_list,
+		bbox = topcell_in.bbox( )
+	)
+
 	# =================================================================
 	print( 'Done parsing!\n' )
 	# =================================================================
-	return pad_list
+	return parsed_gds
 
-def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_out, gds_file_out ):
+def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_out, outline_layer_out, gds_file_out ):
 	# Create a new layout for the interposer
 	layout_out = pya.Layout( )
 	topcell_out = layout_out.create_cell( "footprint_top" )
@@ -140,8 +150,33 @@ def generate_footprint_gds( parsed_gds_in, gds_file_interposer_pad, label_layer_
 	print( 'Placing pads in output gds file...' )
 	# =================================================================
 
-	for pad in parsed_gds_in:
-		topcell_out.insert( pya.CellInstArray( new_cell.cell_index( ), pad.trans ) )	
+	for pad in parsed_gds_in.pad_list:
+		topcell_out.insert( pya.CellInstArray( new_cell.cell_index( ), pad.trans ) )
+
+	# =================================================================
+	print( 'Drawing chip outline on footprint using bounding box of input gds...' )
+	# =================================================================
+
+	# Create a polygon from the bounding box
+	polygon = pya.Polygon( parsed_gds_in.bbox )
+
+	# Get the layer index for the given layer info
+	outline_layer_index = layout_out.layer( outline_layer_out[ 0 ], outline_layer_out[ 1 ] )
+
+	# Insert the polygon into the layout at the given layer
+	topcell_out.shapes( outline_layer_index ).insert( polygon )
+	
+	# =================================================================
+	print( 'Mirroring the output layout so that the input chip can be flipped onto it...' )
+	# =================================================================
+
+	layout_out.transform( pya.Trans.M0 )
+	
+	# =================================================================
+	print( 'Writing footprint GDS to', gds_file_out )
+	# =================================================================
+
+	layout_out.write( gds_file_out )
 
 	return layout_out
 
