@@ -1,14 +1,15 @@
 import gdsfactory as gf
 from gf180.layers import LAYER
+import numpy as np
 
 @gf.cell
-def c4_bump_octagon( pad_layer, pad_size, opening_layer, opening_size, label_layer, label_str ) -> gf.Component:
+def c4_bump_octagon( pad_layer, pad_width, opening_layer, opening_size, label_layer, label_str ) -> gf.Component:
     c = gf.Component( )
 
     # Create top-metal C4 pad
     pad_octagon = c << gf.components.regular_polygon(
         sides = 8,
-        side_length = pad_size,
+        side_length = pad_width / np.sqrt( 4 + 2 * np.sqrt( 2 ) ),
         layer = pad_layer
     )
     # Create circular passivation opening over top metal pad
@@ -51,7 +52,7 @@ if __name__ == "__main__":
     # ================================================================================================
 
     # Define pad sizes
-    pad_size = 50
+    pad_width = 100
     opening_size = 50
 
     # Define offset from bottom-right corner and array spacings
@@ -71,18 +72,18 @@ if __name__ == "__main__":
     # It is important to use both arrays and individual instances for this example to make sure that both work
     # ================================================================================================
 
-    pad_VSS =c4_bump_octagon(
+    pad_VSS = c4_bump_octagon(
         pad_layer = pad_layer,
-        pad_size = pad_size,
+        pad_width = pad_width,
         opening_layer = opening_layer,
         opening_size = opening_size,
         label_layer = label_layer,
         label_str = "DVSS" # I found that just using "VSS" for the label causes it to disappear!
     )
 
-    pad_VDD =c4_bump_octagon(
+    pad_VDD = c4_bump_octagon(
         pad_layer = pad_layer,
-        pad_size = pad_size,
+        pad_width = pad_width,
         opening_layer = opening_layer,
         opening_size = opening_size,
         label_layer = label_layer,
@@ -129,7 +130,7 @@ if __name__ == "__main__":
             pad_num = ind_x + ind_y * num_x
             pad_IO =c4_bump_octagon(
                 pad_layer = pad_layer,
-                pad_size = pad_size,
+                pad_width = pad_width,
                 opening_layer = opening_layer,
                 opening_size = opening_size,
                 label_layer = label_layer,
@@ -153,7 +154,7 @@ if __name__ == "__main__":
     )
 
     # ================================================================================================
-    # Write GDS
+    # Write example chip GDS
     # ================================================================================================
 
     gds_path_out = 'inputs/test_chip.gds'

@@ -10,6 +10,8 @@ if __name__ == "__main__":
 	label_layer_in = ( 53, 10 )
 	pad_layer_in = ( 53, 0 )
 
+	label_layer_out = ( 53, 10 )
+
 	dirname_current = os.path.dirname(__file__)
 
 	gds_file_in = os.path.join( dirname_current, "inputs/test_chip.gds" )
@@ -60,8 +62,6 @@ if __name__ == "__main__":
 	# ================================================================================================
 	# Step 2: Generate a mirrored GDS footprint for a silicon interposer
 	# ================================================================================================
-
-	label_layer_out = ( 53, 10 )
 
 	fp.generate_footprint_gds(
 		parsed_gds_in = parsed_gds_by_name,
