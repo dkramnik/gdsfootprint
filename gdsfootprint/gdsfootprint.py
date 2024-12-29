@@ -17,7 +17,7 @@ class Pad:
 # Main methods
 # ================================================================================================
 
-def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_name = None, search_layer = None ):
+def parse_gds( gds_file_in, label_layer, search_by_cell_name, search_cell_name = None, search_pad_layer = None, pad_size = None ):
 	# =================================================================
 	print( 'Loading input gds file ', gds_file_in )
 	# =================================================================
@@ -32,8 +32,28 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	print( 'Searching for IO pads...' )
 	# =================================================================
 
-	pad_matches = find_insts_with_trans_by_name( cell = layout_in.top_cell( ), name_str = search_cell_name, verbose = True )
-	pad_trans_list = [ x[ 1 ] for x in pad_matches ]
+	if search_by_cell_name:
+		print( 'Searching by cell name for {:s}'.format( search_cell_name ) )
+		pad_matches = find_insts_with_trans_by_name(
+			cell = topcell_in,
+			name_str = search_cell_name,
+			verbose = True
+		)
+		pad_trans_list = [ x[ 1 ] for x in pad_matches ]
+	else:
+		# Get the layer index that corresponds to the lpp we want to search for in the input layout
+		pad_layerinfo = pya.LayerInfo( search_pad_layer )
+		pad_layer_index = layout_in.find_layer( pad_layerinfo )
+
+		print( 'Searching by shapes on layer:', pad_layerinfo, ', index =', pad_layer_index )
+		pad_trans_list = find_all_nsided_polygons_on_layer(
+			search_layer_index = pad_layer_index,
+			layout = layout_in,
+			size = pad_size,
+			n_sides = 8
+		)
+	
+	# Convert GDS translations (trans) into coordinate tuples
 	pad_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for trans in pad_trans_list ]
 
 	# Remove any duplicates (next time check for duplicates in the source GDS within the footprint generation script and prune them there)
@@ -46,15 +66,16 @@ def parse_gds( gds_file_in, label_layer_in, search_by_cell_name, search_cell_nam
 	# =================================================================
 
 	# Get the layer index that corresponds to the lpp we want to search for in the input layout
-	label_layer_info_in = pya.LayerInfo( label_layer_in )
-	search_layer = layout_in.find_layer( label_layer_info_in )
+	label_layerinfo = pya.LayerInfo( label_layer )
+	label_layer_index = layout_in.find_layer( label_layerinfo )
 
-	label_trans_tuple_list = find_text_labels_with_trans( search_layer, layout_in.top_cell( ).flatten( -1, True ) )
+	print( 'Searching by text on layer:', label_layerinfo, ', index =', label_layer_index )
+
+	label_trans_tuple_list = find_text_labels_with_trans( label_layer_index, layout_in.top_cell( ).flatten( -1, True ) )
 	label_coord_list = [ ( trans.disp.x * layout_in.dbu, trans.disp.y * layout_in.dbu ) for ( label, trans ) in label_trans_tuple_list ]
 	label_list = [ label for ( label, trans ) in label_trans_tuple_list ]
 
 	print( label_list )
-
 	print( 'Found {:d} labels in GDS footprint'.format( len( label_trans_tuple_list ) ) )
 
 	# Check that the number of pads and labels matches
@@ -145,19 +166,39 @@ def find_insts_with_trans_by_name( cell, name_str, trans = pya.Trans.new( 0, 0 )
 	return matches
 
 # Utility method for recursively searching for labels in GDS cell
-def find_text_labels_with_trans( search_layer, cell, trans = pya.Trans.new( 0, 0 ) ):
+def find_text_labels_with_trans( search_layer_index, cell, trans = pya.Trans.new( 0, 0 ) ):
 	inst_list = cell.each_inst( )
 	matches = [ ]
 
 	# Iterate through all shapes (texts) in the cell
-	for shape in cell.each_shape( search_layer ):
+	for shape in cell.each_shape( search_layer_index ):
 		if shape.is_text( ):
 			matches.append( ( shape.text.string, trans * shape.text_trans ) )
 
 	# Recursively search through instances (child cells)
 	for inst in inst_list:
-		new_matches = find_text_labels_with_trans( search_layer, inst.cell, trans * inst.trans )
+		new_matches = find_text_labels_with_trans( search_layer_index, inst.cell, trans * inst.trans )
 		if len( new_matches ) > 0:
 			matches += new_matches
 
 	return matches
+
+# Utility method for finding pad-shaped polygons on a layer
+def find_all_nsided_polygons_on_layer( search_layer_index, layout, size, n_sides = 8, tolerance = 0.010 ):
+	top_cell = layout.top_cell( )
+
+	# Flatten topcell so we can iterate through shapes directly
+	top_cell.flatten( -1, True ) # levels, prune
+
+	centers = [ ]
+	for shape in top_cell.shapes( search_layer_index ).each( ):
+		# Check for octagon with tolerance, which is needed due to small rounding bugs that can happen in gdsfactory
+		if ( shape.simple_polygon.num_points( ) == n_sides ) and ( abs( shape.dbbox( ).width( ) - size ) < tolerance ) and ( abs( shape.dbbox( ).height( ) - size ) < tolerance ):
+			trans = pya.Trans.new( shape.bbox( ).center( ) )
+			centers.append( trans )
+		# Debugging that uncovered slightly different sizes than expected for octagons (off by a few nm)
+		elif ( abs( shape.dbbox( ).width( ) - size ) < 1 ) and ( abs( shape.dbbox( ).height( ) - size ) < 1 ):
+			print( 'Note: Excluded shape with width = {:f} and height = {:f}.'.format( shape.dbbox( ).width( ), shape.dbbox( ).height( ) ) )
+
+	# Only return unique centers, some GDS files may have duplicate IOs
+	return list( set( centers ) )

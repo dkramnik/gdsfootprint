@@ -24,9 +24,11 @@ if __name__ == "__main__":
 	# In this version, search by cell name (assuming there is a single unique cell name for the bumps)
 	# ================================================================================================
 
+	print( 'Step 1: Parsing GDS by name.' )
+
 	parsed_gds_by_name = fp.parse_gds(
 		gds_file_in = gds_file_in,
-		label_layer_in = label_layer_in,
+		label_layer = label_layer_in,
 		search_by_cell_name = True,
 		search_cell_name = 'c4_bump'
 	)
@@ -38,11 +40,14 @@ if __name__ == "__main__":
 	# designers' GDS files pasted together
 	# ================================================================================================
 
+	print( 'Step 2: Parsing GDS by layer' )
+
 	parsed_gds_by_layer = fp.parse_gds(
 		gds_file_in = gds_file_in,
-		label_layer_in = label_layer_in,
+		label_layer = label_layer_in,
 		search_by_cell_name = False,
-		search_layer = pad_layer_in
+		search_pad_layer = pad_layer_in,
+		pad_size = 120.71
 	)
 
 	# Double check that the two methods produced identical results
